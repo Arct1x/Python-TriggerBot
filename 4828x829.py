@@ -2,53 +2,61 @@ import configparser
 import ast
 import time
 import pyautogui
+from pynput.keyboard import Controller
 import numpy as np
 from PIL import Image
-import mss
 
-# Read configuration
+
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-# Extract settings from the configuration file
 Colorval = ast.literal_eval(config['Settings']['Colorval'])
 TolerVal = int(config['Settings']['TolerVal'])
 FovVal = int(config['Settings']['FovVal'])
 DelVal = float(config['Settings']['DelVal'])
 TapVal = float(config['Settings']['TapVal'])
-CheckInterval = float(config['Settings'].get('CheckInterval', 0.1))  # Default 0.1 seconds
+CheckInterval = float(config['Settings'].get('CheckInterval', 0.1))  
 
-# Color tolerance adjustment
-def is_color_within_tolerance(color, target_color, tolerance):
+def is_color_within_tolerance(color, target_color, tolerance): # Online resource
     return all(abs(c - t) <= tolerance for c, t in zip(color, target_color))
 
-# Capture a screenshot and check for the target color
-def check_color():
-    with mss.mss() as sct:
-        # Define the monitor region
-        monitor = {'top': 0, 'left': 0, 'width': FovVal, 'height': FovVal}
-        screenshot = sct.grab(monitor)
-        img_np = np.array(screenshot)  # Capture and convert to numpy array
+def get_color_within_fov(x, y, fov): # Online resource
+    region = (x - fov // 2, y - fov // 2, fov, fov)
+    screenshot = pyautogui.screenshot(region=region)
+    img_np = np.array(screenshot)  
 
-        # Create a mask for the target color within tolerance
-        target_color = np.array(Colorval)
-        lower_bound = target_color - TolerVal
-        upper_bound = target_color + TolerVal
-        mask = np.all(np.logical_and(lower_bound <= img_np[:, :, :3], img_np[:, :, :3] <= upper_bound), axis=-1)
+    target_color = np.array(Colorval)
+    lower_bound = target_color - TolerVal
+    upper_bound = target_color + TolerVal
 
-        # Check if there are any True values in the mask
-        if np.any(mask):
-            return True
+    mask = np.all(np.logical_and(lower_bound <= img_np[:, :, :3], img_np[:, :, :3] <= upper_bound), axis=-1)
+
+    if np.any(mask):
+        return True
     return False
 
-# Main loop to continuously check for the color and input 'L'
 def main():
+    keyboard = Controller()
+    i = 0
+    color_detected = False
+
     while True:
-        if check_color():
-            pyautogui.press('l')  # Press the 'L' key
-            print("kms")
-            time.sleep(TapVal)    # Wait for TapVal seconds
-        time.sleep(CheckInterval/1000)  # Wait for CheckInterval seconds before the next check
+        print("checking")
+        x, y = pyautogui.position()
+        if get_color_within_fov(x, y, FovVal):
+            if not color_detected:
+                i += 1
+                print(f"Detected color {i} times")
+                time.sleep(TapVal/1000)
+                color_detected = True
+            else:
+                keyboard.press('l')
+                keyboard.release('l')
+                print(f"Detected color {i} times (no delay)")
+        else:
+            color_detected = False
+
+        time.sleep(CheckInterval)
 
 if __name__ == "__main__":
     main()
