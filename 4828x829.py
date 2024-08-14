@@ -50,8 +50,7 @@ def main():
                 time.sleep(TapVal/1000)
                 color_detected = True
             else:
-                keyboard.press('l')
-                keyboard.release('l')
+                pyautogui.click()
                 print(f"Detected color {i} times (no delay)")
         else:
             color_detected = False
